@@ -22,10 +22,8 @@ where t.source_flag='digital' and t.source_order_rn=1
 )
 /* test output */
  select 
- event_start_date,
- count(customer_account) as customer_count
+ customer_account,event_start_date,digital_first,cc_first,
+ timestamp_diff(cc_first,digital_first, SECOND) 
  from digital_interactions t
  where t.dedup=1
- and event_start_date='2018-07-30'
- group by event_start_date
  limit 100
