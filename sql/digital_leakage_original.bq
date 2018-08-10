@@ -1,0 +1,210 @@
+---DIGITAL LEAKAGE REPORT RE-WRITTEN BY JASON COWAN 27/07/2018.
+
+---THE 'COMMENTS' BELOW ARE NUMBERED IN SEQUENTIAL ORDER OF HOW THE QUERY IS PROCESSED.
+SELECT
+  Digital_Subs_Year As SUBS_YEAR,
+  Digital_Subs_Week_Number As SUBS_WEEK_OF_YEAR,
+  Digital_Subs_Week As SUBS_WEEK_AND_YEAR,
+
+  Digital_Ops_Group As Operation_Group,
+
+  Digital_Channel As Digital_Platform,
+
+  Digital_Intent As Intent,
+
+  Digital_Sub_Category As Subcategory,
+
+  Leaked_Channel,
+
+  Leaked_ops_group,
+
+  Leaked_intent,
+
+  Leaked_subcategory,
+
+  same_intent_flag,
+
+  same_subcat_flag,
+
+  SUM(CASE WHEN LeakedFlag_30min ='Y' THEN 1 ELSE 0 END) AS Leaked_30min,
+
+  SUM(CASE WHEN LeakedFlag_1Hr ='Y' THEN 1 ELSE 0 END) AS Leaked_1Hr,
+
+  SUM(CASE WHEN LeakedFlag_2Hr ='Y' THEN 1 ELSE 0 END) AS Leaked_2Hr,
+
+  SUM(CASE WHEN LeakedFlag_6Hr ='Y' THEN 1 ELSE 0 END) AS Leaked_6Hr,
+
+  SUM(CASE WHEN LeakedFlag_12Hr ='Y' THEN 1 ELSE 0 END) AS Leaked_12Hr,
+
+  SUM(CASE WHEN LeakedFlag_24Hr ='Y' THEN 1 ELSE 0 END) AS Leaked_24Hr,
+
+  SUM(CASE WHEN LeakedFlag_1day ='Y' THEN 1 ELSE 0 END) AS Leaked_1day,
+
+  SUM(CASE WHEN LeakedFlag_2day ='Y' THEN 1 ELSE 0 END) AS Leaked_2day,
+
+  SUM(CASE WHEN LeakedFlag_4day ='Y' THEN 1 ELSE 0 END) AS Leaked_4day,
+
+  SUM(CASE WHEN LeakedFlag_7day ='Y' THEN 1 ELSE 0 END) AS Leaked_7day,
+
+  COUNT(Digital_Switching_Id) As Digital_Interaction
+
+FROM(
+
+SELECT
+
+---COMMENT 3: The partition enables us to only select details of the first non digital interaction (rowid = 1)
+
+  ROW_NUMBER() OVER (PARTITION BY Digital_party_id, Digital_Switching_Id ORDER BY Call_Centre.event_start_datetime ASC) Call_Centre_Row_Id,
+
+  Digital_party_id,
+
+  Digital_Switching_Id,
+
+  Digital_Channel,
+
+  Digital_Subs_Year,
+
+  Digital_Subs_Week,
+
+  Digital_Subs_Week_Number,
+
+  Digital_Ops_Group,
+
+  Digital_Intent,
+
+  Digital_Sub_Category,
+
+  CASE WHEN Call_Centre.event_type IN ('Engineer Support Calls','Contact Centre Calls','Chat') THEN 'Voice' ELSE
+
+  (CASE WHEN Call_Centre.event_type='Message' THEN 'Messaging' ELSE '' END)END AS Leaked_Channel,   
+
+  Call_Centre.event_operation_group As Leaked_ops_group,
+
+  Call_Centre.event_intent As Leaked_intent,
+
+  Call_Centre.event_sub_category As Leaked_subcategory,
+
+  CASE WHEN Digital_Intent =  Call_Centre.event_intent THEN 'Y' ELSE 'N' END As Same_intent_flag,
+
+  CASE WHEN Digital_Sub_Category = Call_Centre.event_sub_category THEN 'Y' ELSE 'N' END As Same_subcat_flag,
+
+  (case when datetime(Call_Centre.event_start_datetime)<=datetime_add(datetime(Digital_Start_Time), INTERVAL 30 MINUTE)
+
+  THEN 'Y' ELSE 'N' END) As LeakedFlag_30min,
+
+  (case when datetime(Call_Centre.event_start_datetime)<=datetime_add(datetime(Digital_Start_Time), INTERVAL 1 HOUR)
+
+  THEN 'Y' ELSE 'N' END) As LeakedFlag_1Hr,
+
+  (case when datetime(Call_Centre.event_start_datetime)<=datetime_add(datetime(Digital_Start_Time), INTERVAL 2 HOUR)
+
+  THEN 'Y' ELSE 'N' END) As LeakedFlag_2Hr,
+
+  (case when datetime(Call_Centre.event_start_datetime)<=datetime_add(datetime(Digital_Start_Time), INTERVAL 6 HOUR)
+
+  THEN 'Y' ELSE 'N' END) As LeakedFlag_6Hr,
+
+  (case when datetime(Call_Centre.event_start_datetime)<=datetime_add(datetime(Digital_Start_Time), INTERVAL 12 HOUR)
+
+  THEN 'Y' ELSE 'N' END) As LeakedFlag_12Hr,
+
+  (case when datetime(Call_Centre.event_start_datetime)<=datetime_add(datetime(Digital_Start_Time), INTERVAL 24 HOUR)
+
+  THEN 'Y' ELSE 'N' END) As LeakedFlag_24Hr,
+
+  (case when datetime(Call_Centre.event_start_datetime)<=datetime_add(datetime(Digital_Start_Time), INTERVAL 1 DAY) 
+
+  THEN 'Y' ELSE 'N' END) As LeakedFlag_1day,
+
+  (case when datetime(Call_Centre.event_start_datetime)<=datetime_add(datetime(Digital_Start_Time), INTERVAL 2 DAY) 
+
+  THEN 'Y' ELSE 'N' END) As LeakedFlag_2day,
+
+  (case when datetime(Call_Centre.event_start_datetime)<=datetime_add(datetime(Digital_Start_Time), INTERVAL 4 DAY) 
+
+  THEN 'Y' ELSE 'N' END) As LeakedFlag_4day,
+
+  (case when datetime(Call_Centre.event_start_datetime)<=datetime_add(datetime( Digital_Start_Time), INTERVAL 7 DAY) 
+
+  THEN 'Y' ELSE 'N' END) As LeakedFlag_7day
+
+FROM(
+
+SELECT 
+
+---COMMENT 1: The partition enables us to only select unique digial interations (rowid = 1)
+
+  ROW_NUMBER() OVER (PARTITION BY Digital.party_id, Digital.Fast_Switching_Interaction_ID ORDER BY          Digital.Account_Interaction_ID ASC) As Digital_Row_Id,
+
+  Digital.party_id As Digital_party_id,
+
+  Digital.Account_Interaction_ID As Digital_Interaction_Id,
+
+  Digital.Fast_Switching_Interaction_ID As Digital_Switching_Id,
+
+  Digital.event_type As Digital_Channel,
+
+  Cal.SUBS_YEAR As Digital_Subs_Year,
+
+  Cal.Subs_Week_And_Year As Digital_Subs_Week,
+
+  Cal.SUBS_WEEK_OF_YEAR As Digital_Subs_Week_Number,
+
+  Digital.interaction_start_date As Digital_Start_Date,
+
+  Digital.interaction_start_datetime As Digital_Start_Time,
+
+  Digital.interaction_operation_group As Digital_Ops_Group,
+
+  Digital.interaction_intent As Digital_Intent,
+
+  Digital.interaction_Sub_Category As Digital_Sub_Category
+
+FROM
+
+  csg_customer_journey_eu.Full_Customer_journey_Interaction_Summary Digital
+
+  INNER JOIN `skyuk-uk-ds-csg-prod.CSG_Insight_Team.CALENDAR_DIM` Cal ON Cal.Calendar_Date=date(timestamp(interaction_start_date))
+
+WHERE
+
+---COMMENT 2: This part is commented out (/* AND */), it's in case you want to run based on dates x and y
+
+/*date(timestamp(interaction_start_date))  >='2017-12-29' AND date(timestamp(interaction_start_date))  <='2018-07-12'*/
+
+ Cal.Subs_Week_And_Year >= 201727 AND Cal.Subs_Week_And_Year <=201728
+
+AND Digital.event_type IN('Web', 'App', 'Interactive')
+
+)DIGITAL_DATA_ARRANGED
+
+---COMMENT 4: This retrieves the calls, chats and messages that occur within 7 days of the digital interaction
+
+LEFT OUTER JOIN csg_customer_journey_eu.Full_Customer_journey Call_Centre
+
+  ON  Digital_party_id=Call_Centre.party_id
+
+  AND date(timestamp(Call_Centre.event_start_date)) >='2017-12-29'
+
+  AND ((Call_Centre.event_type IN('Engineer Support Calls','Contact Centre Calls','Chat') And Call_Centre.CALL_DIRECTION ='INBOUND' AND Call_Centre.time_spent_customer > 0)
+
+  OR (Call_Centre.event_type='Message' AND Call_Centre.conversation_direction='Inbound'))
+
+  AND Call_Centre.event_start_datetime>  Digital_Start_Time
+
+  AND Call_Centre.event_start_date<=DATE_ADD(Digital_Start_Date, INTERVAL 7 DAY)
+
+ 
+
+WHERE
+
+---COMMENT 5: =1 means if a switching id has multiple interactions ids we only take the first one
+
+  Digital_Row_Id = 1
+
+)CALL_DATA_ARRANGED
+WHERE
+---COMMENT 6: =1 means if a non digital contact has multiple interactions we only take details of the the first one
+
+  Call_Centre_Row_Id = 1
+GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13
